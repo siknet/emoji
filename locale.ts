@@ -20,7 +20,7 @@ const locale = [
   {
     code: 'zh-hant',
     iso: 'zh-TW',
-    name: '正體中文',
+    name: '繁體中文',
     file: 'zh-hant.json'
   },
   {

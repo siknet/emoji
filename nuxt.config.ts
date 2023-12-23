@@ -25,7 +25,7 @@ export default defineNuxtConfig({
   i18n: {
     baseUrl: 'https://searchemoji.app',
     strategy: 'prefix_except_default',
-    defaultLocale: 'en',
+    defaultLocale: 'zh-hans',
     detectBrowserLanguage: {
       useCookie: true,
       cookieKey: 'lang',

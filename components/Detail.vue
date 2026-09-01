@@ -10,13 +10,21 @@ const route = useRoute()
 const { locale, t } = useI18n()
 const rtl = computed(() => ['ar', 'he'].includes(locale.value))
 
-const id = route.params.id
-const { data, error, execute } = useFetch(`/api/emoji/${id}`, { query: { locale: locale.value }, immediate: process.server })
-if (props.emoji) {
-  data.value = props.emoji
-} else {
-  execute()
+const defaultData = {
+  c: props.emoji?.c || '',
+  q: '',
+  e: props.emoji?.e || '',
+  v: '',
+  n: '',
+  g: props.emoji?.g || '',
+  s: props.emoji?.s || '',
+  t: props.emoji?.t || '',
+  k: []
 }
+const id = props.emoji?.c || route.params.id
+const { data: fetchData, error } = useFetch(`/api/emoji/${id}`, { query: { locale: locale.value } })
+const data = computed(() => fetchData.value || defaultData)
+
 const title = computed(() => t('seo.detailTitle', { emoji: data.value.e, name: data.value.t }))
 const description = computed(() =>
   t('seo.detailDescription', {
@@ -84,6 +92,55 @@ const platform = [
     imgPath: 'whatsapp'
   }
 ]
+const localePath = useLocalePath()
+const schema = computed(() => [
+  // delete when nuxt-schema-org fix the bug, delete defineWebSite and defineWebPage
+  // defineWebSite({
+  //   '@id': 'https://searchemoji.app/#website',
+  //   '@type': 'WebSite',
+  //   description: t('seo.title'),
+  //   inLanguage: locale.value,
+  //   name: 'SearchEmoji',
+  //   url: 'https://searchemoji.app',
+  //   publisher: {
+  //     '@id': 'https://searchemoji.app/#identity'
+  //   }
+  // }),
+  // defineWebPage({
+  //   '@id': `https://searchemoji.app${localePath('/' + data.value?.c || '')}/#webpage`,
+  //   '@type': 'WebPage',
+  //   description: description.value,
+  //   name: title.value,
+  //   url: localePath('/' + data.value?.c || ''),
+  //   about: {
+  //     '@id': 'https://searchemoji.app/#identity'
+  //   },
+  //   isPartOf: {
+  //     '@id': 'https://searchemoji.app/#website'
+  //   }
+  // }),
+  {
+    '@id': `https://searchemoji.app${localePath('/' + data.value?.c || '')}/#VisualArtwork`,
+    '@type': 'VisualArtwork',
+    name: data.value?.t || '',
+    alternateName: data.value?.n || '',
+    keywords: data.value?.k.join(',') || '',
+    url: localePath('/' + data.value?.c || ''),
+    creator: {
+      '@type': 'Organization',
+      name: 'Unicode',
+      url: 'https://unicode.org/'
+    },
+    image: {
+      '@type': 'ImageObject',
+      contentUrl: `https://img.searchemoji.app/emoji-images/apple/${data.value?.c.toLowerCase()}.webp`,
+      width: 144,
+      height: 144
+    },
+    version: data.value?.v || ''
+  }
+])
+useSchemaOrg(schema)
 </script>
 
 <template>
@@ -121,9 +178,7 @@ const platform = [
         <div class="flex justify-between border-b border-main py-2" :class="rtl ? 'flex-row-reverse' : ''">
           <span class="shrink-0 my-0.5" :class="rtl ? 'flex-row-reverse ml-4' : 'mr-4'">{{ $t('searchKeyword') }}</span>
           <div class="flex items-center flex-wrap justify-end" :class="rtl ? 'flex-row-reverse' : ''">
-            <span v-for="k in data.k[locale]" :key="k" class="card color-action rounded-xl px-2 my-0.5" :class="rtl ? 'flex-row-reverse mr-1' : 'ml-1'">{{
-              k
-            }}</span>
+            <span v-for="k in data.k" :key="k" class="card color-action rounded-xl px-2 my-0.5" :class="rtl ? 'flex-row-reverse mr-1' : 'ml-1'">{{ k }}</span>
           </div>
         </div>
         <div class="flex justify-between border-b border-main py-2" :class="rtl ? 'flex-row-reverse' : ''">

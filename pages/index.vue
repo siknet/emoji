@@ -16,11 +16,11 @@ const flexSearch = new Document({
       //   tokenize: 'forward',
       //   resolution: 9
       // },
-      // {
-      //   field: 'n',
-      //   tokenize: 'forward',
-      //   resolution: 9
-      // },
+      {
+        field: 'n',
+        tokenize: 'forward',
+        resolution: 9
+      },
       ['zh-hans', 'zh-hant', 'ja', 'ko'].includes(locale.value)
         ? {
             field: 't',
@@ -43,21 +43,21 @@ const flexSearch = new Document({
                 tokenize: 'forward',
                 resolution: 9
               },
-      {
-        field: 'k:en',
-        tokenize: 'forward',
-        resolution: 8
-      },
+      // {
+      //   field: 'k:en',
+      //   tokenize: 'forward',
+      //   resolution: 8
+      // },
       ['zh-hans', 'zh-hant', 'ja', 'ko'].includes(locale.value)
         ? {
-            field: `k:${locale.value}`,
+            field: 'k',
             tokenize: 'forward',
             encode: str => str.replace(/[\x00-\x7F]/g, '').split(''),
             resolution: 8
           }
         : ['ar', 'he'].includes(locale.value)
             ? {
-                field: `k:${locale.value}`,
+                field: 'k',
                 encode: false,
                 tokenize: 'forward',
                 // @ts-expect-error wtf
@@ -66,88 +66,63 @@ const flexSearch = new Document({
                 resolution: 8
               }
             : {
-                field: `k:${locale.value}`,
+                field: 'k',
                 tokenize: 'forward',
                 resolution: 8
               }
     ],
-    store: true
+    store: true,
+    worker: true
   }
 })
 interface IndexData {
   emojis: any[]
   groups: any[]
 }
-function extractName (str: string) {
-  if (str.includes(':') && !str.includes(',')) {
-    str = str.replace(/: \w+(-\w+)* skin tone/g, '')
+
+const quality = ref(['fully-qualified'])
+const transformQuality = computed(() => {
+  return quality.value.map(q => qualityMap[q]).join(',')
+})
+const skinTone = ref([])
+const fullSkinTone = computed(() => skinTone.value.map(st => `${st} skin tone`).join(','))
+
+useFetch<IndexData>('/api/emojis', {
+  query: {
+    locale: locale.value,
+    quality: transformQuality,
+    skinTone: fullSkinTone
+  },
+  server: false,
+  onResponse ({ response }) {
+    for (const item of response._data) {
+      flexSearch.add(item)
+    }
+    nextTick(() => {
+      if (keyword.value) {
+        search()
+      }
+    })
   }
-  if (str.includes(':') && str.includes(',')) {
-    str = str
-      .replace(/\w+(-\w+)* skin tone, /g, '')
-      .replace(/(,|:) \w+(-\w+)* skin tone/g, '')
-      .replace(/ \w+(-\w+)* skin tone/g, '')
+})
+const { data, error, pending } = useFetch<IndexData>('/api/home', {
+  query: {
+    locale: locale.value,
+    quality: transformQuality,
+    skinTone: fullSkinTone
   }
-  return str.trim()
-}
-const { data, error, pending } = useFetch<IndexData>('/api/emojis', { query: { locale: locale.value } })
+})
 const keyword = ref((route.query.q as string) || '')
 const searchResult = ref<any>([])
-const searching = ref(false)
+const searching = ref(!!keyword.value)
 
-watch(
-  data,
-  val => {
-    if (val?.emojis.length) {
-      setTimeout(() => {
-        const skinToneGroupIndex = val?.groups.findIndex(gn => gn.n === 'People & Body')
-        const hasSkinTone = val.emojis
-          .filter(ve => ve.g === skinToneGroupIndex && !ve.n.includes('skin tone'))
-          .reduce((acc, cur) => {
-            acc[cur.n] = cur
-            return acc
-          }, {})
-        for (const item of val.emojis) {
-          // To save tokens, tone-modified emoji will not have their own separate keyword generation, but will share the keywords from their non-tone-modified versions.
-          if (item.n.includes('skin tone') && !item.t) {
-            const name = extractName(item.n)
-            const target = hasSkinTone[name]
-            if (target) {
-              item.t = `${target.t} (${item.n})`
-              item.k = target.k
-            } else {
-              item.t = item.n
-            }
-          }
-          flexSearch.add(item)
-        }
-        nextTick(() => {
-          if (keyword.value) {
-            search()
-          }
-        })
-      }, 0)
-    }
-  },
-  {
-    immediate: true
-  }
-)
-function uniqueByEmoji (arr: any[]) {
-  const seen = new Set()
-  return arr.filter(item => {
-    const k = `${item.e}:${item.n}`
-    return seen.has(k) ? false : seen.add(k)
-  })
-}
 function search () {
   const result = flexSearch.search(keyword.value, { limit: 10000, enrich: true })
-  const searRes = result
+  searchResult.value = result
     .map((item: any) => {
       return item.result.map((r: any) => r.doc)
     })
     .flat()
-  searchResult.value = uniqueByEmoji(searRes)
   searching.value = false
   router.replace({ path: route.path, query: { q: keyword.value || undefined } })
   useHead({
@@ -179,10 +154,6 @@ const currentLocale = computed(() => {
 
 const groupBySubGroup = useStorageAsync('groupBySubGroup', false)
 const qualityOptions = Object.keys(qualityMap)
-const quality = useStorageAsync('quality', ['fully-qualified'])
-const transformQuality = computed(() => {
-  return quality.value.map(q => qualityMap[q])
-})
 const skinToneOptions = [
   {
     name: 'light',
@@ -205,8 +176,6 @@ const skinToneOptions = [
     emoji: '🏿'
   }
 ]
-const skinTone = useStorageAsync<string[]>('skinTone', [])
-const fullSkinTone = computed(() => skinTone.value.map(st => `${st} skin tone`))
 function toggleSkinTone (name: string) {
   const index = skinTone.value.findIndex(n => n === name)
   if (index > -1) {
@@ -220,18 +189,16 @@ const emojiCount = ref(0)
 // const groupData = ref<any[]>([])
 const groupData = computed(() => {
   // watch([searchResult, data, transformQuality, fullSkinTone, groupBySubGroup], () => {
-  const list = keyword.value ? searchResult.value : data.value?.emojis || []
-  const skinToneSubGroupIndex = data.value?.groups.findIndex(gn => gn.n === 'skin-tone')
-  const filtered = list.filter(
-    (li: any) =>
-      transformQuality.value.includes(li.q) &&
-      (!li.n.includes('skin tone') ||
-        (li.n.includes('skin tone') && (fullSkinTone.value.find(fst => li.n.includes(' ' + fst)) || li.s === skinToneSubGroupIndex)))
-  )
-  emojiCount.value = filtered.length
+  let list = data.value?.emojis || []
+  if (keyword.value) {
+    list = list.filter(emoji => {
+      return !!searchResult.value.find(item => item.c === emoji.c)
+    })
+  }
+  emojiCount.value = list.length
 
   const group: any[] = []
-  filtered.forEach((d: any) => {
+  list.forEach((d: any) => {
     const groupName = data.value?.groups[d.g]
     const subGroupName = data.value?.groups[d.s]
     const item = {
@@ -396,6 +363,57 @@ function modalClick (ev: any) {
   if (ev.composedPath().find((p: any) => p.className?.includes?.('inner'))) return
   closeDetail()
 }
+const { t } = useI18n()
+useHead({
+  title: t('seo.title')
+})
+const itemList = computed(() => ({
+  '@type': 'ItemList',
+  name: 'Emojis',
+  sameAs: 'https://en.wikipedia.org/wiki/Emoji',
+  numberOfItems: data.value?.emojis.length || 0,
+  itemListElement: (data.value?.emojis || []).map((d, i) => ({
+    '@type': 'ListItem',
+    url: localePath(`/${d.c}`),
+    position: i
+  }))
+}))
+useSchemaOrg([
+  defineWebSite({
+    // delete when nuxt-schema-org fix the bug
+    // '@id': 'https://searchemoji.app/#website',
+    // '@type': 'WebSite',
+    // description: t('seo.title'),
+    // inLanguage: locale.value,
+    // name: 'SearchEmoji',
+    // url: 'https://searchemoji.app',
+    // publisher: {
+    //   '@id': 'https://searchemoji.app/#identity'
+    // },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `https://searchemoji.app${localePath('/')}?q={search_term_string}`
+      },
+      'query-input': 'required name=search_term_string'
+    }
+  }),
+  // defineWebPage({
+  //   '@id': `https://searchemoji.app${localePath('/')}/#webpage`,
+  //   '@type': 'WebPage',
+  //   description: t('seo.description'),
+  //   name: t('seo.title'),
+  //   url: `https://searchemoji.app${localePath('/')}`,
+  //   about: {
+  //     '@id': 'https://searchemoji.app/#identity'
+  //   },
+  //   isPartOf: {
+  //     '@id': 'https://searchemoji.app/#website'
+  //   }
+  // }),
+  itemList
+])
 </script>
 
 <template>
@@ -599,34 +617,25 @@ function modalClick (ev: any) {
             setGroupRef(el, i)
           }
         "
-        class="card p-2 md:p-4 mb-6 rounded-2xl"
+        class="card no-backdrop p-2 md:p-4 mb-6 rounded-2xl"
       >
         <div v-for="sg in g.children" :key="sg.name">
           <h3 v-if="groupBySubGroup" class="pl-2 mb-2 mt-4">{{ sg.localeName }}</h3>
-          <div class="grid flex-wrap gap-1" style="grid-template-columns: repeat(auto-fill, minmax(72px, 1fr))">
+          <div
+            class="grid flex-wrap gap-1 emoji-box"
+            style="grid-template-columns: repeat(auto-fill, minmax(72px, 1fr))"
+            :style="{ fontSize: `${renderEmojiSize}px` }"
+          >
             <template v-if="clickTo === 'detail'">
-              <NuxtLink
-                v-for="d in sg.data"
-                :key="d.e"
-                :to="localePath(`/${d.c}`)"
-                :style="{ fontSize: `${renderEmojiSize}px` }"
-                class="md:tooltip min-w-[72px] h-16 flex justify-center items-center hover:card rounded-2xl"
-                :data-tip="d.t"
-              >
-                <span class="inline-block overflow-hidden w-full text-center emoji-text">{{ d.e }}</span>
+              <NuxtLink v-for="d in sg.data" :key="d.e" :to="localePath(`/${d.c}`)">
+                <h4>{{ d.e }}</h4>
+                <p>{{ d.t }}</p>
               </NuxtLink>
             </template>
             <template v-if="clickTo === 'copy'">
-              <a
-                v-for="d in sg.data"
-                :key="d.e"
-                href="javascript:;"
-                :style="{ fontSize: `${renderEmojiSize}px` }"
-                class="md:tooltip min-w-[72px] h-16 flex justify-center items-center hover:card rounded-2xl relative"
-                :data-tip="$t('clickToCopy') + d.t"
-                @click="copyEmoji(d.e)"
-              >
-                <span class="inline-block overflow-hidden w-full text-center emoji-text">{{ d.e }}</span>
+              <a v-for="d in sg.data" :key="d.e" href="javascript:;" @click="copyEmoji(d.e)">
+                <h4>{{ d.e }}</h4>
+                <p>{{ $t('clickToCopy') + d.t }}</p>
                 <div v-if="source === d.e && copied" class="absolute left-0 top-0 w-full h-full rounded-2xl bg-black/50 flex justify-center items-center">
                   <i class="icon-[material-symbols--check-circle] text-xl text-green-500" aria-hidden="true" role="img" />
                 </div>
@@ -667,8 +676,18 @@ function modalClick (ev: any) {
   </transition>
 </template>
 
-<style scoped>
-.emoji-text {
+<style>
+.emoji-box a {
+  @apply relative min-w-[72px] h-16 flex justify-center items-center hover:card rounded-2xl;
+}
+.emoji-box a h4 {
+  @apply inline-block overflow-hidden w-full text-center;
   content-visibility: auto;
+}
+.emoji-box a p {
+  @apply hidden absolute top-0 left-[50%] w-[auto] translate-x-[-50%] translate-y-[-105%] whitespace-nowrap z-10 bg-zinc-900 shadow-sm text-white py-1 px-2 text-sm rounded-lg;
+}
+.emoji-box a:hover p {
+  @apply md:block;
 }
 </style>

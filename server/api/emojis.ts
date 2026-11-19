@@ -1,21 +1,27 @@
 export default defineEventHandler(ev => {
-  const query = getQuery(ev)
-  const locale = query.locale as string
-  const quality = ((query.quality as string) || '').split(',')
-  const skinTone = ((query.skinTone as string) || '').split(',')
+  setHeader(ev, 'Cache-Control', 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400')
 
-  const groups = ev.context.groups.map((g: any) => ({ n: g.name, nt: g[locale] }))
+  const query = getQuery(ev)
+  const rawLocale = typeof query.locale === 'string' ? query.locale.slice(0, 15) : 'zh-hans'
+  const locale = rawLocale || 'zh-hans'
+  const quality = ((typeof query.quality === 'string' ? query.quality.slice(0, 50) : '') || '').split(',')
+  const skinTone = ((typeof query.skinTone === 'string' ? query.skinTone.slice(0, 100) : '') || '').split(',')
+
+  const emojis = ev.context.emojis || []
+  const groupsData = ev.context.groups || []
+  const groups = groupsData.map((g: any) => ({ n: g.name, nt: g[locale] || g['zh-hans'] || g.name }))
   const skinToneSubGroupIndex = groups.findIndex((gn: any) => gn.n === 'skin-tone')
-  const filtered = ev.context.emojis.filter(
+
+  const filtered = emojis.filter(
     (li: any) =>
       quality.includes(li.q) &&
-      (!li.n.includes('skin tone') || (li.n.includes('skin tone') && (skinTone.find(fst => li.n.includes(' ' + fst)) || li.s === skinToneSubGroupIndex)))
+      (!li.n.includes('skin tone') || (li.n.includes('skin tone') && (skinTone.find(fst => fst && li.n.includes(' ' + fst)) || li.s === skinToneSubGroupIndex)))
   )
 
   return filtered.map((emoji: any) => ({
     c: emoji.c,
     n: emoji.n,
-    t: emoji.t?.[locale],
-    k: emoji.k?.[locale]
+    t: emoji.t?.[locale] || emoji.n,
+    k: emoji.k?.[locale] || []
   }))
 })

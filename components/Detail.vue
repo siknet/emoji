@@ -208,6 +208,8 @@ useSchemaOrg(schema)
                 :src="`https://img.searchemoji.app/emoji-images/${p.imgPath}/${data.c.toLowerCase()}.webp`"
                 width="72"
                 height="72"
+                loading="lazy"
+                decoding="async"
                 :alt="$t('platformImg', { name: data.n, platform: p.name })"
               >
             </div>

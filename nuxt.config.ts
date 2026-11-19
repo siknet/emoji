@@ -28,12 +28,22 @@ export default defineNuxtConfig({
   sitemap: {
     enabled: false
   },
+  robots: {
+    enabled: false
+  },
+  ogImage: {
+    enabled: false
+  },
+  linkChecker: {
+    enabled: false
+  },
   colorMode: {
     classSuffix: '',
     preference: 'dark',
     fallback: 'dark'
   },
   googleFonts: {
+    download: false,
     families: {
       Roboto: [300, 500, 700]
     }
@@ -60,93 +70,49 @@ export default defineNuxtConfig({
     // preset: 'cloudflare_pages'
   },
   routeRules: {
-    '/': { prerender: true }
-    // '/zh-hans': {
-    //   prerender: true
-    // },
-    // '/es': {
-    //   prerender: true
-    // },
-    // '/zh-hant': {
-    //   prerender: true
-    // },
-    // '/de': {
-    //   prerender: true
-    // },
-    // '/ja': {
-    //   prerender: true
-    // },
-    // '/fr': {
-    //   prerender: true
-    // },
-    // '/ko': {
-    //   prerender: true
-    // },
-    // '/pt': {
-    //   prerender: true
-    // },
-    // '/ru': {
-    //   prerender: true
-    // },
-    // '/tr': {
-    //   prerender: true
-    // },
-    // '/ar': {
-    //   prerender: true
-    // },
-    // '/it': {
-    //   prerender: true
-    // },
-    // '/hi': {
-    //   prerender: true
-    // },
-    // '/pl': {
-    //   prerender: true
-    // },
-    // '/bn': {
-    //   prerender: true
-    // },
-    // '/nl': {
-    //   prerender: true
-    // },
-    // '/uk': {
-    //   prerender: true
-    // },
-    // '/id': {
-    //   prerender: true
-    // },
-    // '/ms': {
-    //   prerender: true
-    // },
-    // '/vi': {
-    //   prerender: true
-    // },
-    // '/th': {
-    //   prerender: true
-    // },
-    // '/sv': {
-    //   prerender: true
-    // },
-    // '/el': {
-    //   prerender: true
-    // },
-    // '/he': {
-    //   prerender: true
-    // },
-    // '/fi': {
-    //   prerender: true
-    // },
-    // '/no': {
-    //   prerender: true
-    // },
-    // '/da': {
-    //   prerender: true
-    // },
-    // '/ro': {
-    //   prerender: true
-    // },
-    // '/hu': {
-    //   prerender: true
-    // }
+    // 1. All language homepages statically prerendered at build time
+    '/': { prerender: true },
+    '/zh-hans': { prerender: true },
+    '/en': { prerender: true },
+    '/es': { prerender: true },
+    '/zh-hant': { prerender: true },
+    '/de': { prerender: true },
+    '/ja': { prerender: true },
+    '/fr': { prerender: true },
+    '/ko': { prerender: true },
+    '/pt': { prerender: true },
+    '/ru': { prerender: true },
+    '/tr': { prerender: true },
+    '/ar': { prerender: true },
+    '/it': { prerender: true },
+    '/hi': { prerender: true },
+    '/pl': { prerender: true },
+    '/bn': { prerender: true },
+    '/nl': { prerender: true },
+    '/uk': { prerender: true },
+    '/id': { prerender: true },
+    '/ms': { prerender: true },
+    '/vi': { prerender: true },
+    '/th': { prerender: true },
+    '/sv': { prerender: true },
+    '/el': { prerender: true },
+    '/he': { prerender: true },
+    '/fi': { prerender: true },
+    '/no': { prerender: true },
+    '/da': { prerender: true },
+    '/ro': { prerender: true },
+    '/hu': { prerender: true },
+
+    // 2. API edge CDN caching
+    '/api/**': {
+      headers: {
+        'Cache-Control': 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400'
+      }
+    },
+
+    // 3. All dynamic emoji detail pages use Vercel ISR (7 days revalidation)
+    '/**': {
+      isr: 604800
+    }
   }
 })

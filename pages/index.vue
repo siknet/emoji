@@ -87,22 +87,42 @@ const transformQuality = computed(() => {
 const skinTone = ref([])
 const fullSkinTone = computed(() => skinTone.value.map(st => `${st} skin tone`).join(','))
 
-useFetch<IndexData>('/api/emojis', {
+const clientEmojiCache = new Map<string, any[]>()
+const cacheKey = computed(() => `${locale.value}_${transformQuality.value}_${fullSkinTone.value}`)
+
+useFetch<any[]>('/api/emojis', {
+  key: `emojis-${cacheKey.value}`,
   query: {
     locale: locale.value,
     quality: transformQuality,
     skinTone: fullSkinTone
   },
   server: false,
-  onResponse ({ response }) {
-    for (const item of response._data) {
-      flexSearch.add(item)
-    }
-    nextTick(() => {
-      if (keyword.value) {
-        search()
+  onRequest ({ options }) {
+    const cached = clientEmojiCache.get(cacheKey.value)
+    if (cached) {
+      for (const item of cached) {
+        flexSearch.add(item)
       }
-    })
+      nextTick(() => {
+        if (keyword.value) {
+          search()
+        }
+      })
+    }
+  },
+  onResponse ({ response }) {
+    if (response._data && Array.isArray(response._data)) {
+      clientEmojiCache.set(cacheKey.value, response._data)
+      for (const item of response._data) {
+        flexSearch.add(item)
+      }
+      nextTick(() => {
+        if (keyword.value) {
+          search()
+        }
+      })
+    }
   }
 })
 const { data, error, pending } = useFetch<IndexData>('/api/home', {
@@ -371,11 +391,11 @@ const itemList = computed(() => ({
   '@type': 'ItemList',
   name: 'Emojis',
   sameAs: 'https://en.wikipedia.org/wiki/Emoji',
-  numberOfItems: data.value?.emojis.length || 0,
-  itemListElement: (data.value?.emojis || []).map((d, i) => ({
+  numberOfItems: Math.min(data.value?.emojis.length || 0, 100),
+  itemListElement: (data.value?.emojis || []).slice(0, 100).map((d, i) => ({
     '@type': 'ListItem',
     url: localePath(`/${d.c}`),
-    position: i
+    position: i + 1
   }))
 }))
 useSchemaOrg([

@@ -1,0 +1,22 @@
+{
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/_nuxt/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}

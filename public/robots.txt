@@ -1,0 +1,54 @@
+# Robots.txt for SearchEmoji (https://searchemoji.app)
+
+# 1. Block aggressive AI scrapers and commercial data harvesters
+User-agent: Bytespider
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: DataForSeoBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+# 2. General search engines (Googlebot, Bingbot, Baiduspider, etc.)
+User-agent: *
+Allow: /
+# Disallow search queries to prevent infinite query crawling
+Disallow: /*?*q=*
+Disallow: /*?*quality=*
+Disallow: /*?*skinTone=*
+# Disallow raw API endpoints from search index
+Disallow: /api/

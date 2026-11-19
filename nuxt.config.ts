@@ -67,7 +67,12 @@ export default defineNuxtConfig({
     locales: locale
   },
   nitro: {
-    // preset: 'cloudflare_pages'
+    serverAssets: [
+      {
+        baseName: 'data',
+        dir: './data'
+      }
+    ]
   },
   routeRules: {
     // 1. All language homepages statically prerendered at build time

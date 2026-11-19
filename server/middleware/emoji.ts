@@ -1,4 +1,5 @@
-import { promises as fs } from 'fs'
+import emojisData from '../../data/emoji-index.json'
+import groupsData from '../../data/group-translate.json'
 
 let emojis: any[] = []
 let groups: any[] = []
@@ -24,12 +25,8 @@ async function prepareData () {
 
   initPromise = (async () => {
     try {
-      const [emojiDataStr, groupDataStr] = await Promise.all([
-        fs.readFile('./data/emoji-index.json', { encoding: 'utf-8' }),
-        fs.readFile('./data/group-translate.json', { encoding: 'utf-8' })
-      ])
-      emojis = JSON.parse(emojiDataStr)
-      groups = JSON.parse(groupDataStr)
+      emojis = emojisData
+      groups = groupsData
 
       const skinToneGroupIndex = groups.findIndex(gn => gn.name === 'People & Body')
       const hasSkinTone = emojis

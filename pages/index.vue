@@ -7,6 +7,13 @@ const route = useRoute()
 const router = useRouter()
 const { locale, locales } = useI18n()
 const rtl = computed(() => ['ar', 'he'].includes(locale.value))
+const cjkEncoder = (str: string) => {
+  if (!str) return []
+  const cjkChars = str.match(/[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/g) || []
+  const latinWords = str.toLowerCase().match(/[a-z0-9]+/g) || []
+  return [...cjkChars, ...latinWords]
+}
+
 const flexSearch = new Document({
   document: {
     id: 'c',
@@ -25,7 +32,7 @@ const flexSearch = new Document({
         ? {
             field: 't',
             tokenize: 'forward',
-            encode: str => str.replace(/[\x00-\x7F]/g, '').split(''),
+            encode: cjkEncoder,
             resolution: 9
           }
         : ['ar', 'he'].includes(locale.value)
@@ -52,7 +59,7 @@ const flexSearch = new Document({
         ? {
             field: 'k',
             tokenize: 'forward',
-            encode: str => str.replace(/[\x00-\x7F]/g, '').split(''),
+            encode: cjkEncoder,
             resolution: 8
           }
         : ['ar', 'he'].includes(locale.value)
@@ -87,21 +94,23 @@ const transformQuality = computed(() => {
 const skinTone = ref([])
 const fullSkinTone = computed(() => skinTone.value.map(st => `${st} skin tone`).join(','))
 
-const clientEmojiCache = new Map<string, any[]>()
 const cacheKey = computed(() => `${locale.value}_${transformQuality.value}_${fullSkinTone.value}`)
 
-useFetch<any[]>('/api/emojis', {
+const { data: emojisList } = useFetch<any[]>('/api/emojis', {
   key: `emojis-${cacheKey.value}`,
   query: {
     locale: locale.value,
     quality: transformQuality,
     skinTone: fullSkinTone
   },
-  server: false,
-  onRequest ({ options }) {
-    const cached = clientEmojiCache.get(cacheKey.value)
-    if (cached) {
-      for (const item of cached) {
+  server: false
+})
+
+watch(
+  emojisList,
+  items => {
+    if (items && Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
         flexSearch.add(item)
       }
       nextTick(() => {
@@ -111,20 +120,8 @@ useFetch<any[]>('/api/emojis', {
       })
     }
   },
-  onResponse ({ response }) {
-    if (response._data && Array.isArray(response._data)) {
-      clientEmojiCache.set(cacheKey.value, response._data)
-      for (const item of response._data) {
-        flexSearch.add(item)
-      }
-      nextTick(() => {
-        if (keyword.value) {
-          search()
-        }
-      })
-    }
-  }
-})
+  { immediate: true }
+)
 const { data, error, pending } = useFetch<IndexData>('/api/home', {
   query: {
     locale: locale.value,

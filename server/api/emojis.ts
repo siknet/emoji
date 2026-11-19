@@ -18,10 +18,15 @@ export default defineEventHandler(ev => {
       (!li.n.includes('skin tone') || (li.n.includes('skin tone') && (skinTone.find(fst => fst && li.n.includes(' ' + fst)) || li.s === skinToneSubGroupIndex)))
   )
 
-  return filtered.map((emoji: any) => ({
-    c: emoji.c,
-    n: emoji.n,
-    t: emoji.t?.[locale] || emoji.n,
-    k: emoji.k?.[locale] || []
-  }))
+  return filtered.map((emoji: any) => {
+    const localKeywords = emoji.k?.[locale] || []
+    const enKeywords = locale !== 'en' ? emoji.k?.en || [] : []
+    const keywords = Array.from(new Set([...localKeywords, ...enKeywords]))
+    return {
+      c: emoji.c,
+      n: emoji.n,
+      t: emoji.t?.[locale] || emoji.n,
+      k: keywords
+    }
+  })
 })

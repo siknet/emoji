@@ -79,7 +79,7 @@ const flexSearch = new Document({
               }
     ],
     store: true,
-    worker: true
+    worker: false
   }
 })
 interface IndexData {
@@ -133,17 +133,48 @@ const keyword = ref((route.query.q as string) || '')
 const searchResult = ref<any>([])
 const searching = ref(!!keyword.value)
 
-function search () {
-  const result = flexSearch.search(keyword.value, { limit: 10000, enrich: true })
-  searchResult.value = result
-    .map((item: any) => {
-      return item.result.map((r: any) => r.doc)
+async function search () {
+  const kw = keyword.value ? keyword.value.trim() : ''
+  if (!kw) {
+    searchResult.value = []
+    searching.value = false
+    router.replace({ path: route.path, query: { q: undefined } })
+    useHead({ title: '' })
+    return
+  }
+
+  try {
+    const rawResult = flexSearch.search(kw, { limit: 10000, enrich: true })
+    const result = rawResult instanceof Promise ? await rawResult : rawResult
+    if (Array.isArray(result)) {
+      searchResult.value = result
+        .map((item: any) => {
+          return (item.result || []).map((r: any) => r.doc || r)
+        })
+        .flat()
+    } else {
+      searchResult.value = []
+    }
+  } catch (err) {
+    console.error('FlexSearch error:', err)
+    searchResult.value = []
+  }
+
+  // Fallback: if FlexSearch returned 0 results, do direct keyword matching on emojisList
+  if (searchResult.value.length === 0 && emojisList.value && Array.isArray(emojisList.value)) {
+    const kwLower = kw.toLowerCase()
+    searchResult.value = emojisList.value.filter((emoji: any) => {
+      const matchT = emoji.t && typeof emoji.t === 'string' && emoji.t.toLowerCase().includes(kwLower)
+      const matchN = emoji.n && typeof emoji.n === 'string' && emoji.n.toLowerCase().includes(kwLower)
+      const matchK = Array.isArray(emoji.k) && emoji.k.some((k: string) => typeof k === 'string' && k.toLowerCase().includes(kwLower))
+      return matchT || matchN || matchK
     })
-    .flat()
+  }
+
   searching.value = false
-  router.replace({ path: route.path, query: { q: keyword.value || undefined } })
+  router.replace({ path: route.path, query: { q: kw || undefined } })
   useHead({
-    title: keyword.value ? `🔍 ${keyword.value}` : ''
+    title: kw ? `🔍 ${kw}` : ''
   })
 }
 function searchInput () {
@@ -318,6 +349,9 @@ onMounted(() => {
   isMobile.value = window.innerWidth <= 768
   window.addEventListener('scroll', handleScroll)
   document.addEventListener('keydown', handleKeydown)
+  if (keyword.value) {
+    search()
+  }
 })
 onUnmounted(() => {
   stopWatchGroupDataChange?.()
